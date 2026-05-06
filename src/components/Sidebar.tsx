@@ -19,9 +19,10 @@ interface SidebarProps {
   currentView: string;
   setView: (view: any) => void;
   onLogout: () => void;
+  isOpen: boolean;
 }
 
-export function Sidebar({ user, currentView, setView, onLogout }: SidebarProps) {
+export function Sidebar({ user, currentView, setView, onLogout, isOpen }: SidebarProps) {
   const isAdmin = user.role === "admin";
 
   const menuItems = [
@@ -35,7 +36,11 @@ export function Sidebar({ user, currentView, setView, onLogout }: SidebarProps) 
   ];
 
   return (
-    <aside className="w-64 bg-white/5 border-r border-white/10 backdrop-blur-xl flex flex-col h-screen sticky top-0 p-6">
+    <aside className={cn(
+      "w-64 bg-[#0f172a] lg:bg-white/5 border-r border-white/10 backdrop-blur-xl flex flex-col h-screen sticky top-0 p-6 z-30 transition-transform duration-300",
+      "fixed lg:relative",
+      isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+    )}>
       <div className="flex items-center space-x-3 mb-10">
         <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white">
           <Building2 size={24} />
