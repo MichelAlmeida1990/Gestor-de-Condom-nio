@@ -120,38 +120,40 @@ export function ResidentPortal({ user }: { user: User }) {
 
   return (
     <div className="space-y-6">
-      <header className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white">
-        <h1 className="text-3xl font-bold mb-2">Portal do Morador</h1>
+      <header className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 md:p-8 text-white">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Portal do Morador</h1>
         <p className="text-indigo-100">Bem-vindo, {user.name}!</p>
       </header>
 
       {/* Navigation Tabs */}
-      <div className="flex space-x-1 bg-white/5 p-1 rounded-xl backdrop-blur-sm">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all",
-                activeTab === tab.id
-                  ? "bg-indigo-500 text-white"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
-              )}
-            >
-              <Icon size={18} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+      <div className="overflow-x-auto scrollbar-none -mx-1 px-1">
+        <div className="flex space-x-1 bg-white/5 p-1 rounded-xl backdrop-blur-sm min-w-max">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex items-center space-x-2 px-3 py-2 rounded-lg font-medium transition-all whitespace-nowrap text-sm",
+                  activeTab === tab.id
+                    ? "bg-indigo-500 text-white"
+                    : "text-slate-400 hover:text-white hover:bg-white/5"
+                )}
+              >
+                <Icon size={16} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tab Content */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-md">
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-8 backdrop-blur-md">
         {activeTab === "overview" && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white mb-6">Visão Geral</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-4">Visão Geral</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white/5 p-6 rounded-xl border border-white/10">
@@ -223,8 +225,8 @@ export function ResidentPortal({ user }: { user: User }) {
 
         {activeTab === "documents" && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Documentos</h2>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h2 className="text-xl md:text-2xl font-bold text-white">Documentos</h2>
               <button className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2">
                 <Download size={16} />
                 <span>Baixar Todos</span>
@@ -261,7 +263,7 @@ export function ResidentPortal({ user }: { user: User }) {
 
         {activeTab === "events" && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Eventos e Agenda</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-white">Eventos e Agenda</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {events.map((event) => (
@@ -289,7 +291,7 @@ export function ResidentPortal({ user }: { user: User }) {
 
         {activeTab === "notifications" && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Comunicados</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-white">Comunicados</h2>
             
             <div className="space-y-4">
               {notifications.map((notif) => (
@@ -312,7 +314,7 @@ export function ResidentPortal({ user }: { user: User }) {
 
         {activeTab === "community" && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Comunidade</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-white">Comunidade</h2>
             
             <div className="bg-white/5 p-6 rounded-xl border border-white/10">
               <h3 className="font-semibold text-white mb-4">Áreas Comuns</h3>
