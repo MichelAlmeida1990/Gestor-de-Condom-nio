@@ -20,7 +20,6 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : ["http://localhost:3000", "http://localhost:5173"];
 
-// Always allow Vercel and Render domains
 const CORS_ORIGINS = [
   ...ALLOWED_ORIGINS,
   /\.vercel\.app$/,
@@ -39,7 +38,22 @@ async function initDB() {
       email TEXT UNIQUE,
       password TEXT,
       name TEXT,
-      role TEXT CHECK(role IN ('admin', 'resident'))
+      role TEXT CHECK(role IN ('admin', 'resident')),
+      status TEXT DEFAULT 'active' CHECK(status IN ('pending', 'active', 'rejected')),
+      unit TEXT,
+      phone TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS occurrences (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      type TEXT,
+      description TEXT,
+      status TEXT DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'resolved')),
+      admin_response TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS expenses (
@@ -70,12 +84,18 @@ async function initDB() {
     );
   `);
 
+  // Add missing columns if upgrading from old schema
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'`).catch(() => {});
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS unit TEXT`).catch(() => {});
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`).catch(() => {});
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+
   // Seed admin
   const adminEmail = process.env.ADMIN_EMAIL || "admin@condo.com";
   const { rows: adminRows } = await pool.query("SELECT id FROM users WHERE email = $1", [adminEmail]);
   if (adminRows.length === 0) {
     const hash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || "ChangeMe123!", 12);
-    await pool.query("INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4)", [adminEmail, hash, "Síndico Admin", "admin"]);
+    await pool.query("INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, 'active')", [adminEmail, hash, "Síndico Admin", "admin"]);
   }
 
   // Seed resident
@@ -83,7 +103,7 @@ async function initDB() {
   const { rows: residentRows } = await pool.query("SELECT id FROM users WHERE email = $1", [residentEmail]);
   if (residentRows.length === 0) {
     const hash = bcrypt.hashSync(process.env.RESIDENT_PASSWORD || "ChangeMe123!", 12);
-    await pool.query("INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4)", [residentEmail, hash, "Morador João", "resident"]);
+    await pool.query("INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, 'active')", [residentEmail, hash, "Morador João", "resident"]);
   }
 
   // Seed expenses
@@ -149,6 +169,25 @@ async function startServer() {
   };
 
   // Auth
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { email, password, name, unit, phone } = req.body;
+      if (!email || !password || !name) return res.status(400).json({ error: "Nome, email e senha são obrigatórios" });
+      if (password.length < 6) return res.status(400).json({ error: "Senha deve ter no mínimo 6 caracteres" });
+      const { rows: existing } = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+      if (existing.length > 0) return res.status(409).json({ error: "Email já cadastrado" });
+      const hash = bcrypt.hashSync(password, 12);
+      await pool.query(
+        "INSERT INTO users (email, password, name, role, status, unit, phone) VALUES ($1, $2, $3, 'resident', 'pending', $4, $5)",
+        [email, hash, name, unit || null, phone || null]
+      );
+      res.status(201).json({ message: "Cadastro realizado! Aguarde a aprovação do síndico." });
+    } catch (error) {
+      console.error("Register error:", error);
+      res.status(500).json({ error: "Erro ao realizar cadastro" });
+    }
+  });
+
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -156,6 +195,8 @@ async function startServer() {
       const { rows } = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
       const user = rows[0];
       if (!user || !bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: "Credenciais inválidas" });
+      if (user.status === "pending") return res.status(403).json({ error: "Cadastro aguardando aprovação do síndico." });
+      if (user.status === "rejected") return res.status(403).json({ error: "Cadastro não aprovado. Entre em contato com o síndico." });
       const token = jwt.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, JWT_SECRET!, { expiresIn: "24h" });
       res.json({ token, user: { id: user.id, email: user.email, role: user.role, name: user.name } });
     } catch (error) {
@@ -268,6 +309,64 @@ async function startServer() {
     } catch (error) {
       console.error("Notification deletion error:", error);
       res.status(500).json({ error: "Erro ao deletar notificação" });
+    }
+  });
+
+  // Admin - Users
+  app.get("/api/admin/users", authenticate, isAdmin, async (req, res) => {
+    const { rows } = await pool.query("SELECT id, email, name, role, status, unit, phone, created_at FROM users WHERE role = 'resident' ORDER BY created_at DESC");
+    res.json(rows);
+  });
+
+  app.put("/api/admin/users/:id/status", authenticate, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      if (!["active", "rejected", "pending"].includes(status)) return res.status(400).json({ error: "Status inválido" });
+      const { rowCount } = await pool.query("UPDATE users SET status = $1 WHERE id = $2 AND role = 'resident'", [status, id]);
+      if (rowCount === 0) return res.status(404).json({ error: "Usuário não encontrado" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao atualizar status" });
+    }
+  });
+
+  // Occurrences
+  app.get("/api/occurrences", authenticate, async (req: any, res) => {
+    const isAdminUser = req.user.role === "admin";
+    const { rows } = isAdminUser
+      ? await pool.query("SELECT o.*, u.name as user_name, u.unit FROM occurrences o JOIN users u ON o.user_id = u.id ORDER BY o.created_at DESC")
+      : await pool.query("SELECT * FROM occurrences WHERE user_id = $1 ORDER BY created_at DESC", [req.user.id]);
+    res.json(rows);
+  });
+
+  app.post("/api/occurrences", authenticate, async (req: any, res) => {
+    try {
+      const { type, description } = req.body;
+      if (!type || !description) return res.status(400).json({ error: "Tipo e descrição são obrigatórios" });
+      const { rows } = await pool.query(
+        "INSERT INTO occurrences (user_id, type, description) VALUES ($1, $2, $3) RETURNING id",
+        [req.user.id, type, description]
+      );
+      res.json({ id: rows[0].id });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao criar ocorrência" });
+    }
+  });
+
+  app.put("/api/occurrences/:id", authenticate, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status, admin_response } = req.body;
+      if (!status) return res.status(400).json({ error: "Status é obrigatório" });
+      const { rowCount } = await pool.query(
+        "UPDATE occurrences SET status = $1, admin_response = $2, updated_at = NOW() WHERE id = $3",
+        [status, admin_response || null, id]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: "Ocorrência não encontrada" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao atualizar ocorrência" });
     }
   });
 

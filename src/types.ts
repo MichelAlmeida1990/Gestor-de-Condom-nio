@@ -1,10 +1,37 @@
 export type UserRole = "admin" | "resident";
+export type UserStatus = "pending" | "active" | "rejected";
 
 export interface User {
   id: number;
   email: string;
   name: string;
   role: UserRole;
+  unit?: string;
+  phone?: string;
+}
+
+export interface ResidentUser {
+  id: number;
+  email: string;
+  name: string;
+  role: UserRole;
+  status: UserStatus;
+  unit?: string;
+  phone?: string;
+  created_at: string;
+}
+
+export interface Occurrence {
+  id: number;
+  user_id: number;
+  user_name?: string;
+  unit?: string;
+  type: string;
+  description: string;
+  status: "open" | "in_progress" | "resolved";
+  admin_response?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Expense {

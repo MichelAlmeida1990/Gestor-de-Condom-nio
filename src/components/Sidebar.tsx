@@ -7,10 +7,10 @@ import {
   Bell, 
   FileText, 
   LogOut,
-  User as UserIcon,
-  ShieldCheck,
   Users,
-  Wrench
+  Wrench,
+  AlertTriangle,
+  ShieldCheck
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -28,11 +28,13 @@ export function Sidebar({ user, currentView, setView, onLogout, isOpen }: Sideba
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "resident"] },
     { id: "portal", label: "Portal do Morador", icon: Users, roles: ["admin", "resident"] },
+    { id: "occurrences", label: "Ocorrências", icon: AlertTriangle, roles: ["admin", "resident"] },
     { id: "maintenance", label: "Manutenção", icon: Wrench, roles: ["admin", "resident"] },
     { id: "transparency", label: "Relatórios", icon: FileText, roles: ["admin", "resident"] },
     { id: "notifications", label: "Mural de Avisos", icon: Bell, roles: ["admin", "resident"] },
     { id: "expenses", label: "Despesas", icon: Receipt, roles: ["admin"] },
     { id: "income", label: "Receitas", icon: Wallet, roles: ["admin"] },
+    { id: "admin-users", label: "Moradores", icon: ShieldCheck, roles: ["admin"] },
   ];
 
   return (

@@ -51,12 +51,19 @@ export const api = {
   login: async (credentials: any) => {
     const res = await fetch(`${API_URL}/api/auth/login`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(credentials),
     });
-    if (!res.ok) throw new Error("Credenciais inválidas");
+    if (!res.ok) throw new Error((await res.json()).error || "Credenciais inválidas");
+    return res.json();
+  },
+  register: async (data: any) => {
+    const res = await fetch(`${API_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || "Erro ao cadastrar");
     return res.json();
   },
 };

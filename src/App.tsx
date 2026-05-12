@@ -9,8 +9,10 @@ import { TransparencyReport } from "./components/TransparencyReport";
 import { IncomeManager } from "./components/IncomeManager";
 import { ResidentPortal } from "./components/ResidentPortal";
 import { MaintenanceManager } from "./components/MaintenanceManager";
+import { OccurrenceManager } from "./components/OccurrenceManager";
+import { AdminUsers } from "./components/AdminUsers";
 
-type View = "dashboard" | "expenses" | "income" | "notifications" | "transparency" | "portal" | "maintenance";
+type View = "dashboard" | "expenses" | "income" | "notifications" | "transparency" | "portal" | "maintenance" | "occurrences" | "admin-users";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -83,6 +85,8 @@ export default function App() {
             {view === "transparency" && <TransparencyReport user={user} />}
             {view === "portal" && <ResidentPortal user={user} />}
             {view === "maintenance" && <MaintenanceManager user={user} />}
+            {view === "occurrences" && <OccurrenceManager user={user} />}
+            {view === "admin-users" && <AdminUsers />}
           </div>
         </main>
       </div>
