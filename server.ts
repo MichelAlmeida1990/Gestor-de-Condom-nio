@@ -16,7 +16,16 @@ const __dirname = path.dirname(__filename);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false });
 const PORT = parseInt(process.env.PORT || "3000");
 const JWT_SECRET = process.env.JWT_SECRET;
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(",") || ["http://localhost:3000", "http://localhost:5173"];
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : ["http://localhost:3000", "http://localhost:5173"];
+
+// Always allow Vercel and Render domains
+const CORS_ORIGINS = [
+  ...ALLOWED_ORIGINS,
+  /\.vercel\.app$/,
+  /\.onrender\.com$/,
+];
 
 if (!JWT_SECRET) {
   console.error("❌ JWT_SECRET não configurado no arquivo .env");
@@ -113,7 +122,7 @@ async function startServer() {
 
   const app = express();
   app.use(express.json({ limit: "10mb" }));
-  app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true, methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization"] }));
+  app.use(cors({ origin: CORS_ORIGINS, credentials: true, methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization"] }));
 
   app.use((req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
