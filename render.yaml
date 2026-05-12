@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: condo-manager-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: node --require tsx/cjs server.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: condo-manager-db
+          property: connectionString
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: RESIDENT_EMAIL
+        sync: false
+      - key: RESIDENT_PASSWORD
+        sync: false
+
+databases:
+  - name: condo-manager-db
+    databaseName: condo
+    user: condo_user
+    plan: free

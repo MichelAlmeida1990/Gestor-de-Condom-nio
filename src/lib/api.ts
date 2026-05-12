@@ -1,4 +1,4 @@
-const API_URL = ""; // Relative since we are full-stack
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 export const api = {
   get: async (path: string) => {
