@@ -95,8 +95,9 @@ export function Login({ onLogin }: LoginProps) {
             </button>
             <div className="text-center pt-2 space-y-1">
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Demo:</p>
-              <div className="flex justify-center space-x-4">
-                <span className="text-[10px] text-slate-400 font-mono">admin@condo.com / C0nd0@Admin2024!</span>
+              <div className="flex flex-col items-center space-y-0.5">
+                <span className="text-[10px] text-slate-400 font-mono">admin@condo.com / ChangeMe123!</span>
+                <span className="text-[10px] text-slate-400 font-mono">morador@condo.com / ChangeMe123!</span>
               </div>
             </div>
           </form>
