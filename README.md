@@ -2,19 +2,46 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# CondoTrust — Gestão de Condomínio
 
-This contains everything you need to run your app locally.
+Sistema completo para gestão de condomínios com controle financeiro, transparência para moradores e mural de avisos.
 
-View your app in AI Studio: https://ai.studio/apps/df5b97cd-023c-43c7-851f-3caac0bdfe36
+🌐 **Demo**: [gestor-de-condom-nio.vercel.app](https://gestor-de-condom-nio.vercel.app)
 
-## Run Locally
+## Tecnologias
 
-**Prerequisites:**  Node.js
+- **Frontend**: React + Vite + Tailwind CSS (Vercel)
+- **Backend**: Node.js + Express + PostgreSQL (Render)
 
+## Rodar Localmente
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+**Pré-requisitos:** Node.js, PostgreSQL
+
+1. Instale as dependências:
+   ```bash
+   npm install
+   ```
+
+2. Configure as variáveis de ambiente:
+   ```bash
+   cp .env.example .env
+   ```
+   Preencha `DATABASE_URL` com sua conexão PostgreSQL e `JWT_SECRET` com uma string forte.
+
+3. Rode o servidor:
+   ```bash
+   npm run dev
+   ```
+
+4. Acesse [http://localhost:3000](http://localhost:3000)
+
+## Credenciais de Demo
+
+| Perfil  | Email                  | Senha           |
+|---------|------------------------|-----------------|
+| Admin   | admin@condo.com        | C0nd0@Admin2024!    |
+| Morador | morador@condo.com      | C0nd0@Morador2024!  |
+
+## Deploy
+
+Consulte o [DEPLOY.md](./DEPLOY.md) para instruções completas de deploy na Vercel + Render.
