@@ -18,6 +18,13 @@ export interface ResidentUser {
   status: UserStatus;
   unit?: string;
   phone?: string;
+  cpf?: string;
+  birthdate?: string;
+  emergency_contact?: string;
+  emergency_phone?: string;
+  blood_type?: string;
+  health_notes?: string;
+  vehicles?: string;
   created_at: string;
 }
 
@@ -28,6 +35,9 @@ export interface Occurrence {
   unit?: string;
   type: string;
   description: string;
+  occurrence_date?: string;
+  occurrence_time?: string;
+  evidence_url?: string;
   status: "open" | "in_progress" | "resolved";
   admin_response?: string;
   created_at: string;
@@ -66,4 +76,16 @@ export interface TransparencySummary {
   totalIncome: number;
   balance: number;
   expensesByCategory: { category: string; total: number }[];
+}
+
+export interface Reservation {
+  id: number;
+  user_id: number;
+  user_name?: string;
+  unit?: string;
+  area_name: "Salão de Festas" | "Churrasqueira" | "Espaço Gourmet" | "Quadra Poliesportiva";
+  date: string;
+  time_slot: "Manhã (08:00 - 12:00)" | "Tarde (13:00 - 17:00)" | "Noite (18:00 - 22:00)" | "Dia Inteiro (08:00 - 22:00)";
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
 }
