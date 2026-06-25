@@ -4,19 +4,20 @@ import { AuthRequest, authenticate } from "../middleware.js";
 
 const router = Router();
 
-function getDB() {
-  return (global as any).__db;
-}
+router.get("/summary", authenticate, async (req: AuthRequest, res) => {
+  const expTotalRow = await query<{ total: string | number }>("SELECT COALESCE(SUM(amount), 0) as total FROM expenses");
+  const incTotalRow = await query<{ total: string | number }>("SELECT COALESCE(SUM(amount), 0) as total FROM income");
+  const byCategory = await query<{ category: string; total: string | number }>(
+    "SELECT category, SUM(amount) as total FROM expenses GROUP BY category"
+  );
+  const expTotal = Number(expTotalRow[0]?.total ?? 0);
+  const incTotal = Number(incTotalRow[0]?.total ?? 0);
 
-router.get("/summary", authenticate, (req: AuthRequest, res) => {
-  const expTotal = query(getDB(), "SELECT COALESCE(SUM(amount), 0) as total FROM expenses")[0].total as number;
-  const incTotal = query(getDB(), "SELECT COALESCE(SUM(amount), 0) as total FROM income")[0].total as number;
-  const byCategory = query(getDB(), "SELECT category, SUM(amount) as total FROM expenses GROUP BY category");
   res.json({
     totalExpenses: expTotal,
     totalIncome: incTotal,
     balance: incTotal - expTotal,
-    expensesByCategory: byCategory.map((r) => ({ category: r.category, total: r.total as number })),
+    expensesByCategory: byCategory.map((r) => ({ category: r.category, total: Number(r.total ?? 0) })),
   });
 });
 

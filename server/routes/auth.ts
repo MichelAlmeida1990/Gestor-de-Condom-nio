@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { query, saveDB } from "../database.js";
+import { query } from "../database.js";
 import { checkLoginRateLimit, resetLoginRateLimit } from "../middleware.js";
 import { registerSchema, loginSchema } from "../validation.js";
 import dotenv from "dotenv";
@@ -11,10 +11,6 @@ dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET!;
 const router = Router();
 
-function getDB() {
-  return (global as any).__db;
-}
-
 router.post("/register", async (req: Request, res: Response) => {
   try {
     const validation = registerSchema.safeParse(req.body);
@@ -22,12 +18,13 @@ router.post("/register", async (req: Request, res: Response) => {
       return res.status(400).json({ error: validation.error.issues[0].message });
     }
     const { email, password, name, unit, phone } = validation.data;
-    const existing = query(getDB(), "SELECT id FROM users WHERE email = ?", [email]);
+    const existing = await query("SELECT id FROM users WHERE email = $1", [email]);
     if (existing.length > 0) return res.status(409).json({ error: "Email já cadastrado" });
     const hash = bcrypt.hashSync(password, 12);
-    query(getDB(), "INSERT INTO users (email, password, name, role, status, unit, phone) VALUES (?, ?, ?, 'resident', 'pending', ?, ?)",
-      [email, hash, name, unit || null, phone || null]);
-    saveDB(getDB());
+    await query(
+      "INSERT INTO users (email, password, name, role, status, unit, phone) VALUES ($1, $2, $3, 'resident', 'pending', $4, $5)",
+      [email, hash, name, unit || null, phone || null]
+    );
     res.status(201).json({ message: "Cadastro realizado! Aguarde a aprovação do síndico." });
   } catch (error) {
     console.error("Register error:", error);
@@ -45,7 +42,7 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.status(400).json({ error: validation.error.issues[0].message });
     }
     const { email, password } = validation.data;
-    const rows = query(getDB(), "SELECT * FROM users WHERE email = ?", [email]);
+    const rows = await query("SELECT * FROM users WHERE email = $1", [email]);
     const user = rows[0];
     if (!user || !bcrypt.compareSync(password, user.password as string)) return res.status(401).json({ error: "Credenciais inválidas" });
     if (user.status === "pending") return res.status(403).json({ error: "Cadastro aguardando aprovação do síndico." });

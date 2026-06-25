@@ -1,8 +1,25 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "node",
-    "allowImportingTsExtensions": false
-  }
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowImportingTsExtensions": false,
+    "noEmit": false,
+    "outDir": "dist",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "target": "ES2022",
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "server/**/*",
+    "server.ts"
+  ],
+  "exclude": [
+    "src",
+    "node_modules",
+    "dist"
+  ]
 }

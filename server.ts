@@ -1,399 +1,122 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import { Pool } from "pg";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import cors from "cors";
+import helmet from "helmet";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-import { fileURLToPath } from "url";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { initDB } from "./server/database.js";
+import authRoutes from "./server/routes/auth.js";
+import expensesRoutes from "./server/routes/expenses.js";
+import incomeRoutes from "./server/routes/income.js";
+import notificationsRoutes from "./server/routes/notifications.js";
+import usersRoutes from "./server/routes/users.js";
+import occurrencesRoutes from "./server/routes/occurrences.js";
+import transparencyRoutes from "./server/routes/transparency.js";
+import reservationsRoutes from "./server/routes/reservations.js";
+import { rateLimit, errorHandler } from "./server/middleware.js";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false });
 const PORT = parseInt(process.env.PORT || "3000");
-const JWT_SECRET = process.env.JWT_SECRET;
+
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-  : ["http://localhost:3000", "http://localhost:5173"];
+  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:5175"];
 
-const CORS_ORIGINS = [
-  ...ALLOWED_ORIGINS,
-  /\.vercel\.app$/,
-  /\.onrender\.com$/,
-];
-
-if (!JWT_SECRET) {
-  console.error("❌ JWT_SECRET não configurado no arquivo .env");
-  process.exit(1);
-}
-
-async function initDB() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      email TEXT UNIQUE,
-      password TEXT,
-      name TEXT,
-      role TEXT CHECK(role IN ('admin', 'resident')),
-      status TEXT DEFAULT 'active' CHECK(status IN ('pending', 'active', 'rejected')),
-      unit TEXT,
-      phone TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS occurrences (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id),
-      type TEXT,
-      description TEXT,
-      status TEXT DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'resolved')),
-      admin_response TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS expenses (
-      id SERIAL PRIMARY KEY,
-      description TEXT,
-      amount NUMERIC,
-      category TEXT,
-      date TEXT,
-      attachment_url TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS income (
-      id SERIAL PRIMARY KEY,
-      description TEXT,
-      amount NUMERIC,
-      date TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS notifications (
-      id SERIAL PRIMARY KEY,
-      title TEXT,
-      message TEXT,
-      date TEXT,
-      expires_at TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // Add missing columns if upgrading from old schema
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'`).catch(() => {});
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS unit TEXT`).catch(() => {});
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`).catch(() => {});
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
-
-  // Seed admin
-  const adminEmail = process.env.ADMIN_EMAIL || "admin@condo.com";
-  const { rows: adminRows } = await pool.query("SELECT id FROM users WHERE email = $1", [adminEmail]);
-  if (adminRows.length === 0) {
-    const hash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || "ChangeMe123!", 12);
-    await pool.query("INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, 'active')", [adminEmail, hash, "Síndico Admin", "admin"]);
-  }
-
-  // Seed resident
-  const residentEmail = process.env.RESIDENT_EMAIL || "morador@condo.com";
-  const { rows: residentRows } = await pool.query("SELECT id FROM users WHERE email = $1", [residentEmail]);
-  if (residentRows.length === 0) {
-    const hash = bcrypt.hashSync(process.env.RESIDENT_PASSWORD || "ChangeMe123!", 12);
-    await pool.query("INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, 'active')", [residentEmail, hash, "Morador João", "resident"]);
-  }
-
-  // Seed expenses
-  const { rows: expRows } = await pool.query("SELECT COUNT(*) as count FROM expenses");
-  if (parseInt(expRows[0].count) === 0) {
-    const expenses = [
-      ["Manutenção Elevador", 1200.50, "Manutenção", "2024-01-10"],
-      ["Conta de Luz - Áreas Comuns", 850.00, "Energia/Água", "2024-01-15"],
-      ["Limpeza Quinzenal", 450.00, "Limpeza", "2024-01-20"],
-      ["Reparo Portão Garagem", 320.00, "Manutenção", "2024-01-25"],
-    ];
-    for (const [desc, amt, cat, date] of expenses) {
-      await pool.query("INSERT INTO expenses (description, amount, category, date) VALUES ($1, $2, $3, $4)", [desc, amt, cat, date]);
-    }
-  }
-
-  // Seed income
-  const { rows: incRows } = await pool.query("SELECT COUNT(*) as count FROM income");
-  if (parseInt(incRows[0].count) === 0) {
-    await pool.query("INSERT INTO income (description, amount, date) VALUES ($1, $2, $3)", ["Cotas Condominiais - JAN", 15000.00, "2024-01-05"]);
-  }
-
-  // Seed notifications
-  const { rows: notifRows } = await pool.query("SELECT COUNT(*) as count FROM notifications");
-  if (parseInt(notifRows[0].count) === 0) {
-    await pool.query("INSERT INTO notifications (title, message, date) VALUES ($1, $2, $3)", [
-      "Manutenção de Elevadores",
-      "O elevador social do bloco A passará por manutenção preventiva na próxima segunda-feira (10/02) entre 09:00 e 12:00.",
-      "2024-01-30",
-    ]);
-  }
-}
+const CORS_ORIGINS = [...ALLOWED_ORIGINS, /\.vercel\.app$/, /\.onrender\.com$/];
 
 async function startServer() {
   await initDB();
 
   const app = express();
+  // Simple request logger for debugging (masks password fields)
+  app.use((req, _res, next) => {
+    try {
+      const body = (req as any).body;
+      let safeBody = body;
+      if (body && typeof body === "object") {
+        safeBody = { ...body };
+        if (safeBody.password) safeBody.password = "***";
+      }
+      console.log(`[REQ] ${req.method} ${req.path} origin=${req.headers.origin || "none"} ${Object.keys(safeBody || {}).length ? JSON.stringify(safeBody) : ''}`);
+    } catch (e) {
+      /* ignore logging errors */
+    }
+    next();
+  });
   app.use(express.json({ limit: "10mb" }));
-  app.use(cors({ origin: CORS_ORIGINS, credentials: true, methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization"] }));
 
+  const corsOptions = {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      console.log("[CORS] origin:", origin);
+      if (!origin) {
+        return callback(null, true);
+      }
+      const allowed = CORS_ORIGINS.some((item) => typeof item === "string" ? item === origin : item.test(origin));
+      if (allowed) {
+        return callback(null, true);
+      }
+      callback(new Error("Origin not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
+  };
+
+  app.use(cors(corsOptions));
+  app.options("*", cors(corsOptions));
+
+  // Set correct MIME types for JavaScript modules
   app.use((req, res, next) => {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
-    res.setHeader("X-XSS-Protection", "1; mode=block");
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (req.path.endsWith('.js') || req.path.endsWith('.mjs')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    }
     next();
   });
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }));
 
-  const authenticate = (req: any, res: any, next: any) => {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Unauthorized" });
-    try {
-      req.user = jwt.verify(token, JWT_SECRET!);
-      next();
-    } catch {
-      res.status(401).json({ error: "Invalid token" });
-    }
-  };
+  // API Routes
+  app.use("/api/auth", rateLimit, authRoutes);
+  app.use("/api/expenses", rateLimit, expensesRoutes);
+  app.use("/api/income", rateLimit, incomeRoutes);
+  app.use("/api/notifications", rateLimit, notificationsRoutes);
+  app.use("/api", rateLimit, usersRoutes);
+  app.use("/api/occurrences", rateLimit, occurrencesRoutes);
+  app.use("/api/transparency", rateLimit, transparencyRoutes);
+  app.use("/api/reservations", rateLimit, reservationsRoutes);
 
-  const isAdmin = (req: any, res: any, next: any) => {
-    if (req.user.role !== "admin") return res.status(403).json({ error: "Forbidden" });
-    next();
-  };
+  // Global error handler
+  app.use(errorHandler);
 
-  // Auth
-  app.post("/api/auth/register", async (req, res) => {
-    try {
-      const { email, password, name, unit, phone } = req.body;
-      if (!email || !password || !name) return res.status(400).json({ error: "Nome, email e senha são obrigatórios" });
-      if (password.length < 6) return res.status(400).json({ error: "Senha deve ter no mínimo 6 caracteres" });
-      const { rows: existing } = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
-      if (existing.length > 0) return res.status(409).json({ error: "Email já cadastrado" });
-      const hash = bcrypt.hashSync(password, 12);
-      await pool.query(
-        "INSERT INTO users (email, password, name, role, status, unit, phone) VALUES ($1, $2, $3, 'resident', 'pending', $4, $5)",
-        [email, hash, name, unit || null, phone || null]
-      );
-      res.status(201).json({ message: "Cadastro realizado! Aguarde a aprovação do síndico." });
-    } catch (error) {
-      console.error("Register error:", error);
-      res.status(500).json({ error: "Erro ao realizar cadastro" });
-    }
-  });
-
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      if (!email || !password) return res.status(400).json({ error: "Email e senha são obrigatórios" });
-      const { rows } = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-      const user = rows[0];
-      if (!user || !bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: "Credenciais inválidas" });
-      if (user.status === "pending") return res.status(403).json({ error: "Cadastro aguardando aprovação do síndico." });
-      if (user.status === "rejected") return res.status(403).json({ error: "Cadastro não aprovado. Entre em contato com o síndico." });
-      const token = jwt.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, JWT_SECRET!, { expiresIn: "24h" });
-      res.json({ token, user: { id: user.id, email: user.email, role: user.role, name: user.name } });
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ error: "Erro interno do servidor" });
-    }
-  });
-
-  // Expenses
-  app.get("/api/expenses", authenticate, async (req, res) => {
-    const { rows } = await pool.query("SELECT * FROM expenses ORDER BY date DESC");
-    res.json(rows);
-  });
-
-  app.post("/api/expenses", authenticate, isAdmin, async (req, res) => {
-    try {
-      const { description, amount, category, date, attachment_url } = req.body;
-      if (!description || !amount || !category || !date) return res.status(400).json({ error: "Campos obrigatórios: description, amount, category, date" });
-      if (typeof amount !== "number" || amount <= 0) return res.status(400).json({ error: "Valor deve ser um número positivo" });
-      const { rows } = await pool.query(
-        "INSERT INTO expenses (description, amount, category, date, attachment_url) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-        [description, amount, category, date, attachment_url]
-      );
-      res.json({ id: rows[0].id });
-    } catch (error) {
-      console.error("Expense creation error:", error);
-      res.status(500).json({ error: "Erro ao criar despesa" });
-    }
-  });
-
-  app.put("/api/expenses/:id", authenticate, isAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-      const { description, amount, category, date, attachment_url } = req.body;
-      if (!description || !amount || !category || !date) return res.status(400).json({ error: "Campos obrigatórios: description, amount, category, date" });
-      if (typeof amount !== "number" || amount <= 0) return res.status(400).json({ error: "Valor deve ser um número positivo" });
-      const { rowCount } = await pool.query(
-        "UPDATE expenses SET description=$1, amount=$2, category=$3, date=$4, attachment_url=$5 WHERE id=$6",
-        [description, amount, category, date, attachment_url, id]
-      );
-      if (rowCount === 0) return res.status(404).json({ error: "Despesa não encontrada" });
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Expense update error:", error);
-      res.status(500).json({ error: "Erro ao atualizar despesa" });
-    }
-  });
-
-  app.delete("/api/expenses/:id", authenticate, isAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-      const { rowCount } = await pool.query("DELETE FROM expenses WHERE id=$1", [id]);
-      if (rowCount === 0) return res.status(404).json({ error: "Despesa não encontrada" });
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Expense deletion error:", error);
-      res.status(500).json({ error: "Erro ao deletar despesa" });
-    }
-  });
-
-  // Income
-  app.get("/api/income", authenticate, async (req, res) => {
-    const { rows } = await pool.query("SELECT * FROM income ORDER BY date DESC");
-    res.json(rows);
-  });
-
-  app.post("/api/income", authenticate, isAdmin, async (req, res) => {
-    try {
-      const { description, amount, date } = req.body;
-      if (!description || !amount || !date) return res.status(400).json({ error: "Campos obrigatórios: description, amount, date" });
-      if (typeof amount !== "number" || amount <= 0) return res.status(400).json({ error: "Valor deve ser um número positivo" });
-      const { rows } = await pool.query("INSERT INTO income (description, amount, date) VALUES ($1, $2, $3) RETURNING id", [description, amount, date]);
-      res.json({ id: rows[0].id });
-    } catch (error) {
-      console.error("Income creation error:", error);
-      res.status(500).json({ error: "Erro ao criar receita" });
-    }
-  });
-
-  // Notifications
-  app.get("/api/notifications", authenticate, async (req, res) => {
-    const { rows } = await pool.query("SELECT * FROM notifications ORDER BY date DESC");
-    res.json(rows);
-  });
-
-  app.post("/api/notifications", authenticate, isAdmin, async (req, res) => {
-    try {
-      const { title, message, date, expires_at } = req.body;
-      if (!title || !message || !date) return res.status(400).json({ error: "Campos obrigatórios: title, message, date" });
-      const { rows } = await pool.query(
-        "INSERT INTO notifications (title, message, date, expires_at) VALUES ($1, $2, $3, $4) RETURNING id",
-        [title, message, date, expires_at]
-      );
-      res.json({ id: rows[0].id });
-    } catch (error) {
-      console.error("Notification creation error:", error);
-      res.status(500).json({ error: "Erro ao criar notificação" });
-    }
-  });
-
-  app.delete("/api/notifications/:id", authenticate, isAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-      const { rowCount } = await pool.query("DELETE FROM notifications WHERE id=$1", [id]);
-      if (rowCount === 0) return res.status(404).json({ error: "Notificação não encontrada" });
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Notification deletion error:", error);
-      res.status(500).json({ error: "Erro ao deletar notificação" });
-    }
-  });
-
-  // Admin - Users
-  app.get("/api/admin/users", authenticate, isAdmin, async (req, res) => {
-    const { rows } = await pool.query("SELECT id, email, name, role, status, unit, phone, created_at FROM users WHERE role = 'resident' ORDER BY created_at DESC");
-    res.json(rows);
-  });
-
-  app.put("/api/admin/users/:id/status", authenticate, isAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { status } = req.body;
-      if (!["active", "rejected", "pending"].includes(status)) return res.status(400).json({ error: "Status inválido" });
-      const { rowCount } = await pool.query("UPDATE users SET status = $1 WHERE id = $2 AND role = 'resident'", [status, id]);
-      if (rowCount === 0) return res.status(404).json({ error: "Usuário não encontrado" });
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Erro ao atualizar status" });
-    }
-  });
-
-  // Occurrences
-  app.get("/api/occurrences", authenticate, async (req: any, res) => {
-    const isAdminUser = req.user.role === "admin";
-    const { rows } = isAdminUser
-      ? await pool.query("SELECT o.*, u.name as user_name, u.unit FROM occurrences o JOIN users u ON o.user_id = u.id ORDER BY o.created_at DESC")
-      : await pool.query("SELECT * FROM occurrences WHERE user_id = $1 ORDER BY created_at DESC", [req.user.id]);
-    res.json(rows);
-  });
-
-  app.post("/api/occurrences", authenticate, async (req: any, res) => {
-    try {
-      const { type, description } = req.body;
-      if (!type || !description) return res.status(400).json({ error: "Tipo e descrição são obrigatórios" });
-      const { rows } = await pool.query(
-        "INSERT INTO occurrences (user_id, type, description) VALUES ($1, $2, $3) RETURNING id",
-        [req.user.id, type, description]
-      );
-      res.json({ id: rows[0].id });
-    } catch (error) {
-      res.status(500).json({ error: "Erro ao criar ocorrência" });
-    }
-  });
-
-  app.put("/api/occurrences/:id", authenticate, isAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { status, admin_response } = req.body;
-      if (!status) return res.status(400).json({ error: "Status é obrigatório" });
-      const { rowCount } = await pool.query(
-        "UPDATE occurrences SET status = $1, admin_response = $2, updated_at = NOW() WHERE id = $3",
-        [status, admin_response || null, id]
-      );
-      if (rowCount === 0) return res.status(404).json({ error: "Ocorrência não encontrada" });
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Erro ao atualizar ocorrência" });
-    }
-  });
-
-  // Transparency
-  app.get("/api/transparency/summary", authenticate, async (req, res) => {
-    const { rows: expTotal } = await pool.query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses");
-    const { rows: incTotal } = await pool.query("SELECT COALESCE(SUM(amount), 0) as total FROM income");
-    const { rows: byCategory } = await pool.query("SELECT category, SUM(amount) as total FROM expenses GROUP BY category");
-    res.json({
-      totalExpenses: parseFloat(expTotal[0].total),
-      totalIncome: parseFloat(incTotal[0].total),
-      balance: parseFloat(incTotal[0].total) - parseFloat(expTotal[0].total),
-      expensesByCategory: byCategory.map((r) => ({ category: r.category, total: parseFloat(r.total) })),
-    });
-  });
-
-  // Vite middleware (dev) or static (prod)
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({ root: __dirname, server: { middlewareMode: true }, appType: "spa" });
+    const vite = await createViteServer({
+      root: process.cwd(),
+      configFile: false,
+      server: { middlewareMode: true },
+      appType: "spa",
+      plugins: [react(), tailwindcss()],
+    });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+        }
+      }
+    }));
     app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
 
-  app.listen(PORT, "0.0.0.0", () => console.log(`Server running on http://localhost:${PORT}`));
+  app.listen(PORT, "0.0.0.0", () => console.log(`✅ Server running on http://localhost:${PORT}`));
 }
 
 startServer();

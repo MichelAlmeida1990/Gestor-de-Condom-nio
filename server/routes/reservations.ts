@@ -1,28 +1,23 @@
 import { Router } from "express";
-import { query, run, saveDB } from "../database.js";
+import { query, run } from "../database.js";
 import { AuthRequest, authenticate, isAdmin } from "../middleware.js";
 import { reservationSchema } from "../validation.js";
 
 const router = Router();
 
-function getDB() {
-  return (global as any).__db;
-}
-
 // Auxiliar para checar conflitos
-function checkConflict(area: string, date: string, slot: string, excludeId?: number) {
-  const db = getDB();
-  let sql = "SELECT * FROM reservations WHERE area_name = ? AND date = ? AND status = 'approved'";
+async function checkConflict(area: string, date: string, slot: string, excludeId?: number) {
   const params: unknown[] = [area, date];
+  let sql = "SELECT * FROM reservations WHERE area_name = $1 AND date = $2 AND status = 'approved'";
 
   if (excludeId) {
-    sql += " AND id != ?";
+    sql += " AND id != $3";
     params.push(excludeId);
   }
 
-  const approved = query(db, sql, params);
+  const approved = await query(sql, params);
 
-  return approved.some((r) => {
+  return approved.some((r: any) => {
     if (r.time_slot === "Dia Inteiro (08:00 - 22:00)" || slot === "Dia Inteiro (08:00 - 22:00)") {
       return true;
     }
@@ -31,32 +26,23 @@ function checkConflict(area: string, date: string, slot: string, excludeId?: num
 }
 
 // Listar reservas
-router.get("/", authenticate, (req: AuthRequest, res) => {
-  const db = getDB();
+router.get("/", authenticate, async (req: AuthRequest, res) => {
   if (req.user?.role === "admin") {
-    // Admin vê todas as reservas
-    const data = query(db, `
-      SELECT r.*, u.name as user_name, u.unit 
-      FROM reservations r 
-      JOIN users u ON r.user_id = u.id 
-      ORDER BY r.date DESC, r.time_slot ASC
-    `);
-    res.json(data);
-  } else {
-    // Morador vê todas as aprovadas (para consultar agenda) + suas próprias (pendentes/rejeitadas/aprovadas)
-    const data = query(db, `
-      SELECT r.*, u.name as user_name, u.unit 
-      FROM reservations r 
-      JOIN users u ON r.user_id = u.id 
-      WHERE r.status = 'approved' OR r.user_id = ?
-      ORDER BY r.date DESC, r.time_slot ASC
-    `, [req.user?.id]);
-    res.json(data);
+    const data = await query(
+      `SELECT r.*, u.name as user_name, u.unit FROM reservations r JOIN users u ON r.user_id = u.id ORDER BY r.date DESC, r.time_slot ASC`
+    );
+    return res.json(data);
   }
+
+  const data = await query(
+    `SELECT r.*, u.name as user_name, u.unit FROM reservations r JOIN users u ON r.user_id = u.id WHERE r.status = 'approved' OR r.user_id = $1 ORDER BY r.date DESC, r.time_slot ASC`,
+    [req.user?.id]
+  );
+  res.json(data);
 });
 
 // Solicitar reserva
-router.post("/", authenticate, (req: AuthRequest, res) => {
+router.post("/", authenticate, async (req: AuthRequest, res) => {
   try {
     const validation = reservationSchema.safeParse(req.body);
     if (!validation.success) {
@@ -65,29 +51,22 @@ router.post("/", authenticate, (req: AuthRequest, res) => {
 
     const { area_name, date, time_slot } = validation.data;
 
-    // Bloquear reservas retroativas
     const today = new Date().toISOString().split("T")[0];
     if (date < today) {
       return res.status(400).json({ error: "Não é possível reservar datas no passado." });
     }
 
-    // Verificar se já existe um conflito com reserva aprovada
-    if (checkConflict(area_name, date, time_slot)) {
+    if (await checkConflict(area_name, date, time_slot)) {
       return res.status(409).json({ error: "Este horário já está reservado e aprovado para outro morador." });
     }
 
-    // Admin cria como aprovada por padrão, morador como pendente
     const status = req.user?.role === "admin" ? "approved" : "pending";
+    const rows = await query<{ id: number }>(
+      "INSERT INTO reservations (user_id, area_name, date, time_slot, status) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+      [req.user?.id, area_name, date, time_slot, status]
+    );
 
-    query(getDB(), `
-      INSERT INTO reservations (user_id, area_name, date, time_slot, status) 
-      VALUES (?, ?, ?, ?, ?)
-    `, [req.user?.id, area_name, date, time_slot, status]);
-
-    const id = query(getDB(), "SELECT last_insert_rowid() as id")[0].id;
-    saveDB(getDB());
-
-    res.json({ id, status });
+    res.json({ id: rows[0]?.id, status });
   } catch (error) {
     console.error("Erro ao criar reserva:", error);
     res.status(500).json({ error: "Erro interno ao criar reserva." });
@@ -95,36 +74,33 @@ router.post("/", authenticate, (req: AuthRequest, res) => {
 });
 
 // Atualizar status (apenas admin)
-router.put("/:id/status", authenticate, isAdmin, (req: AuthRequest, res) => {
+router.put("/:id/status", authenticate, isAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
     const { status } = req.body;
 
     if (!status || !["approved", "rejected", "pending"].includes(status)) {
       return res.status(400).json({ error: "Status inválido." });
     }
 
-    const db = getDB();
-    const rows = query(db, "SELECT * FROM reservations WHERE id = ?", [id]);
+    const rows = await query("SELECT * FROM reservations WHERE id = $1", [id]);
     if (rows.length === 0) {
       return res.status(404).json({ error: "Reserva não encontrada." });
     }
 
-    const reservation = rows[0];
+    const reservation = rows[0] as any;
 
-    // Se estiver aprovando, verificar conflito novamente
     if (status === "approved") {
-      if (checkConflict(reservation.area_name as string, reservation.date as string, reservation.time_slot as string, id)) {
+      if (await checkConflict(reservation.area_name as string, reservation.date as string, reservation.time_slot as string, id)) {
         return res.status(409).json({ error: "Não é possível aprovar. Este horário já está reservado por outra reserva aprovada." });
       }
     }
 
-    const { rowCount } = run(db, "UPDATE reservations SET status = ? WHERE id = ?", [status, id]);
+    const { rowCount } = await run("UPDATE reservations SET status = $1 WHERE id = $2", [status, id]);
     if (rowCount === 0) {
       return res.status(404).json({ error: "Falha ao atualizar status." });
     }
 
-    saveDB(db);
     res.json({ success: true });
   } catch (error) {
     console.error("Erro ao atualizar reserva:", error);
@@ -133,29 +109,25 @@ router.put("/:id/status", authenticate, isAdmin, (req: AuthRequest, res) => {
 });
 
 // Cancelar / Excluir reserva
-router.delete("/:id", authenticate, (req: AuthRequest, res) => {
+router.delete("/:id", authenticate, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const db = getDB();
-
-    const rows = query(db, "SELECT * FROM reservations WHERE id = ?", [id]);
+    const id = parseInt(req.params.id, 10);
+    const rows = await query("SELECT * FROM reservations WHERE id = $1", [id]);
     if (rows.length === 0) {
       return res.status(404).json({ error: "Reserva não encontrada." });
     }
 
-    const reservation = rows[0];
+    const reservation = rows[0] as any;
 
-    // Moradores só podem cancelar suas próprias reservas
     if (req.user?.role !== "admin" && reservation.user_id !== req.user?.id) {
       return res.status(403).json({ error: "Acesso negado." });
     }
 
-    const { rowCount } = run(db, "DELETE FROM reservations WHERE id = ?", [id]);
+    const { rowCount } = await run("DELETE FROM reservations WHERE id = $1", [id]);
     if (rowCount === 0) {
       return res.status(404).json({ error: "Falha ao excluir." });
     }
 
-    saveDB(db);
     res.json({ success: true });
   } catch (error) {
     console.error("Erro ao excluir reserva:", error);

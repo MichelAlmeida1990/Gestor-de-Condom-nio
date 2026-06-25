@@ -104,8 +104,6 @@ export async function initDB(): Promise<Pool> {
 
     const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
     const adminPassword = process.env.ADMIN_PASSWORD || "StrongAdminPassword123!";
-    const residentEmail = process.env.RESIDENT_EMAIL || "resident@example.com";
-    const residentPassword = process.env.RESIDENT_PASSWORD || "StrongResidentPassword123!";
 
     const { rows: adminRows } = await client.query("SELECT id FROM users WHERE email = $1", [adminEmail]);
     if (adminRows.length === 0) {
@@ -113,15 +111,6 @@ export async function initDB(): Promise<Pool> {
       await client.query(
         "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, 'admin', 'active')",
         [adminEmail, hash, "Síndico Admin"]
-      );
-    }
-
-    const { rows: residentRows } = await client.query("SELECT id FROM users WHERE email = $1", [residentEmail]);
-    if (residentRows.length === 0) {
-      const hash = bcrypt.hashSync(residentPassword, 12);
-      await client.query(
-        "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, 'resident', 'active')",
-        [residentEmail, hash, "Morador João"]
       );
     }
   } finally {

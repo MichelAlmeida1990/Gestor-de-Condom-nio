@@ -1,44 +1,42 @@
 import { Router } from "express";
-import { query, run, saveDB } from "../database.js";
+import { query, run } from "../database.js";
 import { AuthRequest, authenticate, isAdmin } from "../middleware.js";
 import { incomeSchema } from "../validation.js";
 
 const router = Router();
 
-function getDB() {
-  return (global as any).__db;
-}
-
-router.get("/", authenticate, (req: AuthRequest, res) => {
-  const data = query(getDB(), "SELECT * FROM income ORDER BY date DESC");
+router.get("/", authenticate, async (req: AuthRequest, res) => {
+  const data = await query("SELECT * FROM income ORDER BY date DESC");
   res.json(data);
 });
 
-router.post("/", authenticate, isAdmin, (req: AuthRequest, res) => {
+router.post("/", authenticate, isAdmin, async (req: AuthRequest, res) => {
   try {
     const validation = incomeSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: validation.error.issues[0].message });
     }
     const { description, amount, date } = validation.data;
-    query(getDB(), "INSERT INTO income (description, amount, date) VALUES (?, ?, ?)", [description, amount, date]);
-    const id = query(getDB(), "SELECT last_insert_rowid() as id")[0].id;
-    saveDB(getDB());
-    res.json({ id });
+    const rows = await query<{ id: number }>(
+      "INSERT INTO income (description, amount, date) VALUES ($1, $2, $3) RETURNING id",
+      [description, amount, date]
+    );
+    res.json({ id: rows[0]?.id });
   } catch (error) {
+    console.error("Income creation error:", error);
     res.status(500).json({ error: "Erro ao criar receita" });
   }
 });
 
-router.delete("/:id", authenticate, isAdmin, (req: AuthRequest, res) => {
+router.delete("/:id", authenticate, isAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-    const { rowCount } = run(getDB(), "DELETE FROM income WHERE id=?", [id]);
+    const { rowCount } = await run("DELETE FROM income WHERE id=$1", [id]);
     if (rowCount === 0) return res.status(404).json({ error: "Receita não encontrada" });
-    saveDB(getDB());
     res.json({ success: true });
   } catch (error) {
+    console.error("Income deletion error:", error);
     res.status(500).json({ error: "Erro ao deletar receita" });
   }
 });
