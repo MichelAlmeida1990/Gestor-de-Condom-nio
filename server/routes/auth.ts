@@ -56,4 +56,42 @@ router.post("/login", async (req: Request, res: Response) => {
   }
 });
 
+// Endpoint temporário para limpar dados fictícios (só admin)
+router.post("/clear-fake-data", async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Verificar se é admin
+    const rows = await query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = rows[0];
+    if (!user || !bcrypt.compareSync(password, user.password as string)) {
+      return res.status(401).json({ error: "Credenciais inválidas" });
+    }
+    if (user.role !== "admin") {
+      return res.status(403).json({ error: "Apenas admin pode limpar dados" });
+    }
+    
+    // Limpar dados fictícios
+    await query("DELETE FROM reservations;");
+    await query("DELETE FROM occurrences;");
+    await query("DELETE FROM notifications;");
+    await query("DELETE FROM expenses;");
+    await query("DELETE FROM income;");
+    await query("DELETE FROM users WHERE role = 'resident';");
+    
+    // Resetar sequências
+    await query("ALTER SEQUENCE users_id_seq RESTART WITH 1;");
+    await query("ALTER SEQUENCE occurrences_id_seq RESTART WITH 1;");
+    await query("ALTER SEQUENCE expenses_id_seq RESTART WITH 1;");
+    await query("ALTER SEQUENCE income_id_seq RESTART WITH 1;");
+    await query("ALTER SEQUENCE notifications_id_seq RESTART WITH 1;");
+    await query("ALTER SEQUENCE reservations_id_seq RESTART WITH 1;");
+    
+    res.json({ message: "Dados fictícios limpos com sucesso!" });
+  } catch (error) {
+    console.error("Clear data error:", error);
+    res.status(500).json({ error: "Erro ao limpar dados" });
+  }
+});
+
 export default router;
