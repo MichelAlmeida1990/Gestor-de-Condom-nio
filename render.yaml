@@ -2,8 +2,8 @@ services:
   - type: web
     name: condo-manager-api
     runtime: node
-    buildCommand: npm install && npm run clean && npx tsc -p tsconfig.server.json && npm run build
-    startCommand: node dist/server.js
+    buildCommand: npm install
+    startCommand: node start.cjs
     envVars:
       - key: NODE_ENV
         value: production
