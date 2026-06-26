@@ -3,7 +3,7 @@ services:
     name: condo-manager-api
     runtime: node
     buildCommand: npm install
-    startCommand: node start.cjs
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
