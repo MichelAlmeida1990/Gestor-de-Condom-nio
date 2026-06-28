@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import type { FormEvent } from "react";
 import { api } from "../lib/api";
 import { User } from "../types";
 import { formatDate, cn } from "../lib/utils";
@@ -12,7 +13,11 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  XCircle
+  XCircle,
+  X,
+  Save,
+  Eye,
+  Printer
 } from "lucide-react";
 
 interface MaintenanceRequest {
@@ -30,21 +35,12 @@ interface MaintenanceRequest {
   cost?: number;
 }
 
-interface Vendor {
-  id: number;
-  name: string;
-  category: string;
-  phone: string;
-  email: string;
-  rating: number;
-}
-
 export function MaintenanceManager({ user }: { user: User }) {
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingRequest, setEditingRequest] = useState<MaintenanceRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -82,72 +78,8 @@ export function MaintenanceManager({ user }: { user: User }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Mock data for demonstration
-        setRequests([
-          {
-            id: 1,
-            title: "Vazamento no teto do apto 201",
-            description: "Vazamento de água no teto da sala do apartamento 201, provavelmente do apartamento 301.",
-            category: "hidraulica",
-            priority: "high",
-            status: "pending",
-            requested_by: "João Silva",
-            created_at: "2024-02-01"
-          },
-          {
-            id: 2,
-            title: "Manutenção preventiva elevador social",
-            description: "Manutenção mensal programada do elevador social conforme contrato.",
-            category: "elevadores",
-            priority: "medium",
-            status: "in_progress",
-            requested_by: "Admin",
-            assigned_to: "Elevadores S/A",
-            created_at: "2024-02-01",
-            updated_at: "2024-02-02"
-          },
-          {
-            id: 3,
-            title: "Troca de lâmpadas garagem",
-            description: "Substituir lâmpadas queimadas na garagem subsolo.",
-            category: "eletrica",
-            priority: "low",
-            status: "completed",
-            requested_by: "Maria Santos",
-            assigned_to: "Zelador José",
-            created_at: "2024-01-28",
-            updated_at: "2024-01-29",
-            completed_at: "2024-01-29",
-            cost: 150.00
-          }
-        ]);
-
-        setVendors([
-          {
-            id: 1,
-            name: "Elevadores S/A",
-            category: "Elevadores",
-            phone: "(11) 3456-7890",
-            email: "contato@elevadores.com.br",
-            rating: 4.5
-          },
-          {
-            id: 2,
-            name: "Hidráulica Express",
-            category: "Hidráulica",
-            phone: "(11) 2345-6789",
-            email: "contato@hidraulica.com.br",
-            rating: 4.2
-          },
-          {
-            id: 3,
-            name: "Elétrica Total",
-            category: "Elétrica",
-            phone: "(11) 3456-1234",
-            email: "contato@eletrica.com.br",
-            rating: 4.0
-          }
-        ]);
+        const data = await api.get("/maintenance");
+        setRequests(data);
       } catch (error) {
         console.error("Failed to fetch maintenance data", error);
       } finally {
@@ -157,26 +89,47 @@ export function MaintenanceManager({ user }: { user: User }) {
     fetchData();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
       if (editingRequest) {
-        // Update request
+        const updatedRequest = {
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          priority: formData.priority,
+          assigned_to: formData.assigned_to || undefined,
+          status: editingRequest.status,
+          cost: editingRequest.cost
+        };
+
+        await api.put(`/maintenance/${editingRequest.id}`, updatedRequest);
         setRequests(requests.map(req => 
           req.id === editingRequest.id 
-            ? { ...req, ...formData, updated_at: new Date().toISOString().split('T')[0] }
+            ? { ...req, ...updatedRequest, updated_at: new Date().toISOString(), completed_at: updatedRequest.status === 'completed' ? new Date().toISOString() : req.completed_at }
             : req
         ));
       } else {
-        // Create new request
-        const newRequest: MaintenanceRequest = {
-          id: Date.now(),
-          ...formData,
-          status: "pending",
-          requested_by: user.name,
-          created_at: new Date().toISOString().split('T')[0]
+        const newRequestPayload = {
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          priority: formData.priority,
+          assigned_to: formData.assigned_to || undefined,
         };
-        setRequests([...requests, newRequest]);
+
+        const newRequest = await api.post("/maintenance", newRequestPayload);
+        setRequests([
+          ...requests,
+          {
+            id: newRequest.id,
+            ...newRequestPayload,
+            status: "pending",
+            requested_by: user.name,
+            created_at: newRequest.created_at,
+            updated_at: newRequest.created_at,
+          },
+        ]);
       }
       
       setShowForm(false);
@@ -194,22 +147,41 @@ export function MaintenanceManager({ user }: { user: User }) {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("Tem certeza que deseja excluir esta solicitação?")) {
+    if (!confirm("Tem certeza que deseja excluir esta solicitação?")) return;
+    try {
+      await api.delete(`/maintenance/${id}`);
       setRequests(requests.filter(req => req.id !== id));
+    } catch (error) {
+      console.error("Failed to delete maintenance request", error);
     }
   };
 
-  const updateStatus = (id: number, status: MaintenanceRequest['status']) => {
-    setRequests(requests.map(req => 
-      req.id === id 
-        ? { 
-            ...req, 
-            status, 
-            updated_at: new Date().toISOString().split('T')[0],
-            completed_at: status === 'completed' ? new Date().toISOString().split('T')[0] : undefined
-          }
-        : req
-    ));
+  const updateStatus = async (id: number, status: MaintenanceRequest['status']) => {
+    try {
+      const request = requests.find(req => req.id === id);
+      if (!request) return;
+      await api.put(`/maintenance/${id}`, {
+        title: request.title,
+        description: request.description,
+        category: request.category,
+        priority: request.priority,
+        assigned_to: request.assigned_to || undefined,
+        status,
+        cost: request.cost,
+      });
+      setRequests(requests.map(req => 
+        req.id === id 
+          ? { 
+              ...req, 
+              status, 
+              updated_at: new Date().toISOString(),
+              completed_at: status === 'completed' ? new Date().toISOString() : undefined
+            }
+          : req
+      ));
+    } catch (error) {
+      console.error("Failed to update maintenance status", error);
+    }
   };
 
   if (loading) {
@@ -281,7 +253,7 @@ export function MaintenanceManager({ user }: { user: User }) {
                     className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-white appearance-none"
                   >
                     {categories.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      <option key={cat.value} value={cat.value} className="bg-slate-800 text-white">{cat.label}</option>
                     ))}
                   </select>
                 </div>
@@ -294,7 +266,7 @@ export function MaintenanceManager({ user }: { user: User }) {
                     className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-white appearance-none"
                   >
                     {priorities.map(pri => (
-                      <option key={pri.value} value={pri.value}>{pri.label}</option>
+                      <option key={pri.value} value={pri.value} className="bg-slate-800 text-white">{pri.label}</option>
                     ))}
                   </select>
                 </div>
@@ -303,16 +275,13 @@ export function MaintenanceManager({ user }: { user: User }) {
               {user.role === "admin" && (
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Atribuído para</label>
-                  <select
+                  <input
+                    type="text"
                     value={formData.assigned_to}
                     onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                    className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-white appearance-none"
-                  >
-                    <option value="">Selecione um prestador</option>
-                    {vendors.map(vendor => (
-                      <option key={vendor.id} value={vendor.name}>{vendor.name}</option>
-                    ))}
-                  </select>
+                    className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-white transition-all placeholder-slate-600"
+                    placeholder="Nome do prestador ou responsável"
+                  />
                 </div>
               )}
 
@@ -342,6 +311,168 @@ export function MaintenanceManager({ user }: { user: User }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Detail View Modal */}
+      {selectedRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/80 backdrop-blur-xl p-4">
+          <div className="bg-[#1e293b] w-full max-w-3xl rounded-[32px] shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-black text-white tracking-tighter">Detalhes da Solicitação</h2>
+                <button
+                  onClick={() => setSelectedRequest(null)}
+                  className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Título</label>
+                  <p className="text-white font-medium">{selectedRequest.title}</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Descrição</label>
+                  <p className="text-white">{selectedRequest.description}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Categoria</label>
+                    <p className="text-white">{categories.find(c => c.value === selectedRequest.category)?.label}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Prioridade</label>
+                    <span className={`text-sm font-medium ${priorities.find(p => p.value === selectedRequest.priority)?.color}`}>
+                      {priorities.find(p => p.value === selectedRequest.priority)?.label}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Status</label>
+                    <div className="flex items-center space-x-2">
+                      {(() => {
+                        const statusInfo = statuses.find(s => s.value === selectedRequest.status);
+                        const StatusIcon = statusInfo?.icon || Clock;
+                        return <>
+                          <StatusIcon className={statusInfo?.color} size={16} />
+                          <span className="text-white">{statusInfo?.label}</span>
+                        </>;
+                      })()}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Solicitante</label>
+                    <div className="flex items-center space-x-2">
+                      <UserIcon size={14} />
+                      <span className="text-white">{selectedRequest.requested_by}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Data de Abertura</label>
+                    <div className="flex items-center space-x-2">
+                      <Calendar size={14} />
+                      <span className="text-white">{new Date(selectedRequest.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às {new Date(selectedRequest.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
+                  {selectedRequest.updated_at && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Última Atualização</label>
+                      <div className="flex items-center space-x-2">
+                        <Calendar size={14} />
+                        <span className="text-white">{new Date(selectedRequest.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às {new Date(selectedRequest.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {selectedRequest.assigned_to && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Atribuído para</label>
+                    <p className="text-white">{selectedRequest.assigned_to}</p>
+                  </div>
+                )}
+
+                {selectedRequest.completed_at && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Data de Conclusão</label>
+                    <div className="flex items-center space-x-2">
+                      <Calendar size={14} />
+                      <span className="text-white">{new Date(selectedRequest.completed_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às {new Date(selectedRequest.completed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
+                )}
+
+                {selectedRequest.cost && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Custo</label>
+                    <p className="text-white">R$ {selectedRequest.cost.toFixed(2)}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-3 pt-4 border-t border-white/10">
+                <button
+                  onClick={() => setSelectedRequest(null)}
+                  className="flex-1 min-w-[120px] py-3 text-sm font-bold text-slate-400 border border-white/10 rounded-2xl hover:bg-white/5 transition-all flex items-center justify-center space-x-2"
+                >
+                  <X size={16} />
+                  <span>Fechar</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingRequest(selectedRequest);
+                    setFormData({
+                      title: selectedRequest.title,
+                      description: selectedRequest.description,
+                      category: selectedRequest.category,
+                      priority: selectedRequest.priority,
+                      assigned_to: selectedRequest.assigned_to || ""
+                    });
+                    setShowForm(true);
+                    setSelectedRequest(null);
+                  }}
+                  className="flex-1 min-w-[120px] py-3 text-sm font-bold text-white bg-indigo-600 rounded-2xl hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center space-x-2"
+                >
+                  <Edit size={16} />
+                  <span>Editar</span>
+                </button>
+                <button
+                  onClick={() => handleDelete(selectedRequest.id)}
+                  className="flex-1 min-w-[120px] py-3 text-sm font-bold text-white bg-rose-600 rounded-2xl hover:bg-rose-500 transition-all shadow-lg shadow-rose-600/20 flex items-center justify-center space-x-2"
+                >
+                  <Trash2 size={16} />
+                  <span>Excluir</span>
+                </button>
+                <button
+                  onClick={() => {
+                    // View functionality - could open in a new tab or different format
+                    window.open(window.location.href, '_blank');
+                  }}
+                  className="flex-1 min-w-[120px] py-3 text-sm font-bold text-white bg-cyan-600 rounded-2xl hover:bg-cyan-500 transition-all shadow-lg shadow-cyan-600/20 flex items-center justify-center space-x-2"
+                >
+                  <Eye size={16} />
+                  <span>Visualizar</span>
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="flex-1 min-w-[120px] py-3 text-sm font-bold text-white bg-slate-600 rounded-2xl hover:bg-slate-500 transition-all shadow-lg shadow-slate-600/20 flex items-center justify-center space-x-2"
+                >
+                  <Printer size={16} />
+                  <span>Imprimir</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -384,17 +515,28 @@ export function MaintenanceManager({ user }: { user: User }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
+              {requests.length === 0 && (
+                <tr>
+                  <td colSpan={user.role === "admin" ? 7 : 6} className="px-6 py-16 text-center text-slate-500">
+                    Nenhuma solicitação registrada.
+                  </td>
+                </tr>
+              )}
               {requests.map((request) => {
                 const statusInfo = statuses.find(s => s.value === request.status);
                 const priorityInfo = priorities.find(p => p.value === request.priority);
                 const StatusIcon = statusInfo?.icon || Clock;
                 
                 return (
-                  <tr key={request.id} className="hover:bg-white/5 transition-colors">
+                  <tr 
+                    key={request.id} 
+                    className="hover:bg-white/5 transition-colors cursor-pointer"
+                    onClick={() => setSelectedRequest(request)}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">#{request.id}</td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="text-sm font-medium text-white">{request.title}</div>
+                        <div className="text-sm font-medium text-indigo-400">{request.title}</div>
                         <div className="text-xs text-slate-400 mt-1">{request.description}</div>
                       </div>
                     </td>
@@ -421,7 +563,7 @@ export function MaintenanceManager({ user }: { user: User }) {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
                       <div className="flex items-center space-x-2">
                         <Calendar size={14} />
-                        <span>{formatDate(request.created_at)}</span>
+                        <span>{new Date(request.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às {new Date(request.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </td>
                     {user.role === "admin" && (
@@ -433,7 +575,7 @@ export function MaintenanceManager({ user }: { user: User }) {
                             className="px-2 py-1 bg-white/5 border border-white/10 rounded text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           >
                             {statuses.map(status => (
-                              <option key={status.value} value={status.value}>{status.label}</option>
+                              <option key={status.value} value={status.value} className="bg-slate-800 text-white">{status.label}</option>
                             ))}
                           </select>
                           <button
