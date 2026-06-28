@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { query, run } from "../database.js";
-import { AuthRequest, authenticate, isAdmin } from "../middleware.js";
+import { type AuthRequest, authenticate, isAdmin } from "../middleware.js";
 import { notificationSchema } from "../validation.js";
 
 const router = Router();

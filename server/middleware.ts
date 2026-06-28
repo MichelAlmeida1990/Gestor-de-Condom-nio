@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { type Request, type Response, type NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
@@ -11,9 +11,9 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-export interface AuthRequest extends Request {
+export type AuthRequest = Request & {
   user?: { id: number; email: string; role: string; name: string };
-}
+};
 
 // Rate limiter for login
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
