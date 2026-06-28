@@ -118,6 +118,16 @@ export async function initDB(): Promise<Pool> {
       );
     `);
 
+    // Migrações idempotentes para bancos criados por versões antigas do schema.
+    const migrations = [
+      "ALTER TABLE occurrences ADD COLUMN IF NOT EXISTS occurrence_date DATE",
+      "ALTER TABLE occurrences ADD COLUMN IF NOT EXISTS occurrence_time TEXT",
+      "ALTER TABLE occurrences ADD COLUMN IF NOT EXISTS evidence_url TEXT",
+    ];
+    for (const sql of migrations) {
+      await client.query(sql);
+    }
+
     const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
     const adminPassword = process.env.ADMIN_PASSWORD || "StrongAdminPassword123!";
 
