@@ -8,6 +8,8 @@ export function TransparencyReport({ user }: { user: User }) {
   const [summary, setSummary] = useState<TransparencySummary | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [income, setIncome] = useState<Income[]>([]);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [selectedIncome, setSelectedIncome] = useState<Income | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export function TransparencyReport({ user }: { user: User }) {
           </div>
           <div className="divide-y divide-white/5 max-h-[500px] overflow-y-auto px-2">
             {income.map(item => (
-              <div key={item.id} className="p-6 flex items-center justify-between hover:bg-white/5 transition-all rounded-3xl group m-2 border border-transparent hover:border-white/5">
+              <div key={item.id} className="p-6 flex items-center justify-between hover:bg-white/5 transition-all rounded-3xl group m-2 border border-transparent hover:border-white/5 cursor-pointer" onClick={() => setSelectedIncome(item)}>
                 <div>
                   <p className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors uppercase tracking-tight">{item.description}</p>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">{formatDate(item.date)}</p>
@@ -108,7 +110,7 @@ export function TransparencyReport({ user }: { user: User }) {
           </div>
           <div className="divide-y divide-white/5 max-h-[500px] overflow-y-auto px-2">
             {expenses.map(item => (
-              <div key={item.id} className="p-6 flex items-center justify-between hover:bg-white/5 transition-all rounded-3xl group m-2 border border-transparent hover:border-white/5">
+              <div key={item.id} className="p-6 flex items-center justify-between hover:bg-white/5 transition-all rounded-3xl group m-2 border border-transparent hover:border-white/5 cursor-pointer" onClick={() => setSelectedExpense(item)}>
                 <div>
                   <p className="text-sm font-bold text-white group-hover:text-rose-300 transition-colors uppercase tracking-tight">{item.description}</p>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">{item.category} • {formatDate(item.date)}</p>
@@ -133,6 +135,78 @@ export function TransparencyReport({ user }: { user: User }) {
           </p>
         </div>
       </div>
+      {/* Detail Modals */}
+      {selectedIncome && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/80 backdrop-blur-xl p-4">
+          <div className="bg-[#1e293b] w-full max-w-md rounded-[32px] shadow-2xl border border-white/10 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <h2 className="text-xl font-bold text-white">Detalhe da Receita</h2>
+              <button onClick={() => setSelectedIncome(null)} className="text-slate-500 hover:text-white p-2 bg-white/5 rounded-full transition-colors">Fechar</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Descrição</p>
+                <p className="text-white font-semibold">{selectedIncome.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Valor</p>
+                  <p className="text-emerald-400 font-black font-mono text-lg">+{formatCurrency(selectedIncome.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Data</p>
+                  <p className="text-white text-sm">{formatDate(selectedIncome.date)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Registrado em</p>
+                  <p className="text-slate-400 text-sm">{formatDate(selectedIncome.created_at)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 pt-0">
+              <button onClick={() => setSelectedIncome(null)} className="w-full py-3 text-sm font-bold text-slate-400 border border-white/10 rounded-xl hover:bg-white/5 transition-all">Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/80 backdrop-blur-xl p-4">
+          <div className="bg-[#1e293b] w-full max-w-md rounded-[32px] shadow-2xl border border-white/10 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <h2 className="text-xl font-bold text-white">Detalhe da Despesa</h2>
+              <button onClick={() => setSelectedExpense(null)} className="text-slate-500 hover:text-white p-2 bg-white/5 rounded-full transition-colors">Fechar</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Descrição</p>
+                <p className="text-white font-semibold">{selectedExpense.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Valor</p>
+                  <p className="text-rose-400 font-black font-mono text-lg">-{formatCurrency(selectedExpense.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Categoria</p>
+                  <span className="px-3 py-1 bg-indigo-500/10 rounded-lg text-xs font-black text-indigo-300 uppercase border border-indigo-500/10">{selectedExpense.category}</span>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Data</p>
+                  <p className="text-white text-sm">{formatDate(selectedExpense.date)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Lançado em</p>
+                  <p className="text-slate-400 text-sm">{formatDate(selectedExpense.created_at)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 pt-0">
+              <button onClick={() => setSelectedExpense(null)} className="w-full py-3 text-sm font-bold text-slate-400 border border-white/10 rounded-xl hover:bg-white/5 transition-all">Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,16 +6,14 @@
 
 Sistema completo para gestão de condomínios com controle financeiro, transparência para moradores e mural de avisos.
 
-🌐 **Demo**: [gestor-de-condom-nio.vercel.app](https://gestor-de-condom-nio.vercel.app)
-
 ## Tecnologias
 
-- **Frontend**: React + Vite + Tailwind CSS (Vercel)
-- **Backend**: Node.js + Express + PostgreSQL (Render)
+- **Frontend**: React + Vite + Tailwind CSS
+- **Backend**: Node.js + Express + PostgreSQL
 
 ## Rodar Localmente
 
-**Pré-requisitos:** Node.js, PostgreSQL
+**Pré-requisitos:** Node.js
 
 1. Instale as dependências:
    ```bash
@@ -26,7 +24,7 @@ Sistema completo para gestão de condomínios com controle financeiro, transpar�
    ```bash
    cp .env.example .env
    ```
-   Preencha `DATABASE_URL` com sua conexão PostgreSQL e `JWT_SECRET` com uma string forte.
+   Preencha `JWT_SECRET` com uma string forte e configure as credenciais de admin e residente.
 
 3. Rode o servidor:
    ```bash
@@ -34,13 +32,6 @@ Sistema completo para gestão de condomínios com controle financeiro, transpar�
    ```
 
 4. Acesse [http://localhost:3000](http://localhost:3000)
-
-## Credenciais de Demo
-
-| Perfil  | Email                  | Senha           |
-|---------|------------------------|-----------------|
-| Admin   | admin@condo.com        | C0nd0@Admin2024!    |
-| Morador | morador@condo.com      | C0nd0@Morador2024!  |
 
 ## Deploy
 

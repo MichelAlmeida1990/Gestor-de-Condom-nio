@@ -94,12 +94,9 @@ export function Login({ onLogin }: LoginProps) {
               {loading ? "ENTRANDO..." : "ACESSAR"}
             </button>
             <div className="text-center pt-2 space-y-1">
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Demo:</p>
-              <div className="flex flex-col items-center space-y-0.5">
-                <span className="text-[10px] text-slate-400 font-mono">admin@condo.com / ChangeMe123!</span>
-                <span className="text-[10px] text-slate-400 font-mono">morador@condo.com / ChangeMe123!</span>
-              </div>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Acesse com suas credenciais de conta configurada.</p>
             </div>
+
           </form>
         ) : (
           <form className="space-y-4" onSubmit={handleRegister}>

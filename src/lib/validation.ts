@@ -41,6 +41,18 @@ export const idSchema = z.object({
   id: z.string().regex(/^\d+$/, 'ID inválido').transform(Number)
 });
 
+// Reservation validation schema
+export const reservationSchema = z.object({
+  area_name: z.enum(['Salão de Festas', 'Churrasqueira', 'Espaço Gourmet', 'Quadra Poliesportiva']),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida (YYYY-MM-DD)"),
+  time_slot: z.enum([
+    'Manhã (08:00 - 12:00)',
+    'Tarde (13:00 - 17:00)',
+    'Noite (18:00 - 22:00)',
+    'Dia Inteiro (08:00 - 22:00)'
+  ])
+});
+
 // Export types
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
@@ -50,3 +62,4 @@ export type IncomeUpdateInput = z.infer<typeof incomeUpdateSchema>;
 export type NotificationInput = z.infer<typeof notificationSchema>;
 export type NotificationUpdateInput = z.infer<typeof notificationUpdateSchema>;
 export type IdInput = z.infer<typeof idSchema>;
+export type ReservationInput = z.infer<typeof reservationSchema>;

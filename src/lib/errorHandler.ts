@@ -9,16 +9,16 @@ export class APIError extends Error {
   }
 }
 
-export const handleAPIError = (error: any, defaultMessage: string = 'Erro interno do servidor') => {
+export const handleAPIError = (error: Error | APIError | { errors?: Array<{ message: string }> }, defaultMessage: string = 'Erro interno do servidor') => {
   console.error('API Error:', error);
-  
+
   if (error instanceof APIError) {
     return { error: error.message, code: error.code };
   }
-  
-  if (error.errors && Array.isArray(error.errors)) {
+
+  if ('errors' in error && Array.isArray(error.errors)) {
     return { error: error.errors[0].message };
   }
-  
+
   return { error: defaultMessage };
 };

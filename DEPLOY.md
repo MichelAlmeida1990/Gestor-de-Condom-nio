@@ -45,10 +45,19 @@ condo-manager.vercel.app       condo-api.onrender.com
 Na seção **Environment Variables**, adicione:
 
 ```
- 
+NODE_ENV=production
+PORT=3000
+JWT_SECRET=<sua-chave-secreta-forte>
+DATABASE_URL=<internal-database-url-do-render>
+ALLOWED_ORIGINS=https://<sua-url-do-frontend-vercel>
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=StrongAdminPassword123!
+RESIDENT_EMAIL=resident@example.com
+RESIDENT_PASSWORD=StrongResidentPassword123!
 ```
 
-**⚠️ IMPORTANTE**: Substitua `https://seu-app.vercel.app` pela URL real da Vercel (você vai obter no próximo passo)
+- Use a URL interna do banco do Render para `DATABASE_URL`.
+- `ALLOWED_ORIGINS` deve conter a URL exata do frontend Vercel.
 
 4. Clique em **Create Web Service**
 5. Aguarde o deploy (3-5 minutos)
@@ -98,9 +107,7 @@ Exemplo: `VITE_API_URL=https://condo-manager-api.onrender.com`
 ## ✅ 3. Testar o Deploy
 
 1. Acesse a URL da Vercel
-2. Faça login com:
-   - **Admin**: `admin@condo.com` / `ChangeMe123!`
-   - **Morador**: `morador@condo.com` / `ChangeMe123!`
+2. Faça login com as credenciais configuradas no ambiente de produção.
 
 ---
 

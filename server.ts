@@ -18,6 +18,7 @@ import usersRoutes from "./server/routes/users.js";
 import occurrencesRoutes from "./server/routes/occurrences.js";
 import transparencyRoutes from "./server/routes/transparency.js";
 import reservationsRoutes from "./server/routes/reservations.js";
+import maintenanceRoutes from "./server/routes/maintenance.js";
 import { rateLimit, errorHandler } from "./server/middleware.js";
 
 const PORT = parseInt(process.env.PORT || "3000");
@@ -89,6 +90,7 @@ async function startServer() {
   app.use("/api/notifications", rateLimit, notificationsRoutes);
   app.use("/api", rateLimit, usersRoutes);
   app.use("/api/occurrences", rateLimit, occurrencesRoutes);
+  app.use("/api/maintenance", rateLimit, maintenanceRoutes);
   app.use("/api/transparency", rateLimit, transparencyRoutes);
   app.use("/api/reservations", rateLimit, reservationsRoutes);
 

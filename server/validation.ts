@@ -47,6 +47,16 @@ export const occurrenceSchema = z.object({
   evidence_url: z.string().url().optional().or(z.literal("")),
 });
 
+export const maintenanceSchema = z.object({
+  title: z.string().min(2, "Título deve ter no mínimo 2 caracteres"),
+  description: z.string().min(2, "Descrição deve ter no mínimo 2 caracteres"),
+  category: z.string().min(1, "Categoria é obrigatória"),
+  priority: z.enum(["low", "medium", "high", "urgent"], "Prioridade inválida"),
+  assigned_to: z.string().optional().or(z.literal("")),
+  status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
+  cost: z.number().positive("Custo deve ser positivo").optional(),
+});
+
 // Profile update validation schema
 export const profileUpdateSchema = z.object({
   name: z.string().min(2, "Nome deve ter no mínimo 2 caracteres"),

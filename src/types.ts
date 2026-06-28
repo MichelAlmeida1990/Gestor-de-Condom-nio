@@ -71,6 +71,22 @@ export interface Notification {
   created_at: string;
 }
 
+export interface MaintenanceRequest {
+  id: number;
+  user_id: number;
+  title: string;
+  description: string;
+  category: string;
+  priority: "low" | "medium" | "high" | "urgent";
+  status: "pending" | "in_progress" | "completed" | "cancelled";
+  requested_by: string;
+  assigned_to?: string;
+  cost?: number;
+  created_at: string;
+  updated_at?: string;
+  completed_at?: string;
+}
+
 export interface TransparencySummary {
   totalExpenses: number;
   totalIncome: number;

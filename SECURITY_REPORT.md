@@ -38,10 +38,10 @@
 JWT_SECRET=super-secret-jwt-key-32-characters-minimum-length
 DB_PATH=./condo.db
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
-ADMIN_EMAIL=admin@condo.com
-ADMIN_PASSWORD=ChangeMe123!
-RESIDENT_EMAIL=morador@condo.com
-RESIDENT_PASSWORD=ChangeMe123!
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=StrongAdminPassword123!
+RESIDENT_EMAIL=resident@example.com
+RESIDENT_PASSWORD=StrongResidentPassword123!
 ```
 
 ### Validação de Dados

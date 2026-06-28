@@ -2,19 +2,13 @@ import { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { User, TransparencySummary, Expense, Notification } from "../types";
 import { formatCurrency, formatDate } from "../lib/utils";
-import { 
-  TrendingDown, 
-  TrendingUp, 
-  DollarSign, 
-  Bell,
-  ArrowRight,
-  TrendingUp as TrendingUpIcon
-} from "lucide-react";
+import { TrendingDown, TrendingUp, DollarSign, Bell, ArrowRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 const COLORS = ["#6366f1", "#8b5cf6", "#3b82f6", "#f43f5e", "#f59e0b"];
 
 export function Dashboard({ user }: { user: User }) {
+  const [openModal, setOpenModal] = useState<null | { type: string; data?: any }>(null);
   const [summary, setSummary] = useState<TransparencySummary | null>(null);
   const [latestExpenses, setLatestExpenses] = useState<Expense[]>([]);
   const [latestNotifications, setLatestNotifications] = useState<Notification[]>([]);
@@ -62,7 +56,7 @@ export function Dashboard({ user }: { user: User }) {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-        <div className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-xl shadow-indigo-500/5">
+        <div onClick={() => setOpenModal({ type: 'balance' })} role="button" tabIndex={0} className="cursor-pointer bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-xl shadow-indigo-500/5">
           <p className="text-slate-400 text-sm font-medium flex items-center space-x-2">
             <DollarSign size={14} className="text-indigo-400" />
             <span>Saldo Atual</span>
@@ -70,7 +64,7 @@ export function Dashboard({ user }: { user: User }) {
           <p className="text-2xl font-bold mt-2 text-emerald-400">{formatCurrency(summary?.balance || 0)}</p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-xl">
+        <div onClick={() => setOpenModal({ type: 'expenses' })} role="button" tabIndex={0} className="cursor-pointer bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-xl">
           <p className="text-slate-400 text-sm font-medium flex items-center space-x-2">
             <TrendingDown size={14} className="text-rose-400" />
             <span>Despesas do Mês</span>
@@ -78,7 +72,7 @@ export function Dashboard({ user }: { user: User }) {
           <p className="text-2xl font-bold mt-2 text-white">{formatCurrency(summary?.totalExpenses || 0)}</p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-xl">
+        <div onClick={() => setOpenModal({ type: 'income' })} role="button" tabIndex={0} className="cursor-pointer bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-xl">
           <p className="text-slate-400 text-sm font-medium flex items-center space-x-2">
             <TrendingUp size={14} className="text-indigo-400" />
             <span>Receitas do Mês</span>
@@ -86,7 +80,7 @@ export function Dashboard({ user }: { user: User }) {
           <p className="text-2xl font-bold mt-2 text-white">{formatCurrency(summary?.totalIncome || 0)}</p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-xl">
+        <div onClick={() => setOpenModal({ type: 'alerts' })} role="button" tabIndex={0} className="cursor-pointer bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-xl">
           <p className="text-slate-400 text-sm font-medium flex items-center space-x-2">
             <Bell size={14} className="text-amber-400" />
             <span>Alertas</span>
@@ -133,6 +127,85 @@ export function Dashboard({ user }: { user: User }) {
               </BarChart>
             </ResponsiveContainer>
           </div>
+      {/* Modal Explanations */}
+      {openModal?.type === 'balance' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/80 backdrop-blur-xl p-4">
+          <div className="bg-[#1e293b] w-full max-w-2xl rounded-[32px] shadow-2xl border border-white/10 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">Saldo Atual — Histórico</h3>
+              <button onClick={() => setOpenModal(null)} className="text-slate-400 hover:text-white">Fechar</button>
+            </div>
+            <p className="text-slate-400 mb-4">Este saldo é o resultado das receitas e despesas registradas. Abaixo estão os lançamentos recentes que compõem este valor.</p>
+            <div className="divide-y divide-white/5">
+              {latestExpenses.map(e => (
+                <div key={e.id} className="py-3 flex items-center justify-between">
+                  <div>
+                    <div className="text-white font-semibold">{e.description}</div>
+                    <div className="text-xs text-slate-500">{e.category} • {formatDate(e.date)}</div>
+                  </div>
+                  <div className="text-rose-400 font-black">-{formatCurrency(e.amount)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openModal?.type === 'expenses' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/80 backdrop-blur-xl p-4">
+          <div className="bg-[#1e293b] w-full max-w-xl rounded-[32px] shadow-2xl border border-white/10 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">Despesas do Mês — Explicação</h3>
+              <button onClick={() => setOpenModal(null)} className="text-slate-400 hover:text-white">Fechar</button>
+            </div>
+            <p className="text-slate-400 mb-4">As despesas do mês são somadas automaticamente a partir dos lançamentos registrados. Verifique cada lançamento no histórico para entender a composição.</p>
+            <div className="divide-y divide-white/5 max-h-64 overflow-y-auto">
+              {latestExpenses.map(e => (
+                <div key={e.id} className="py-3 flex items-center justify-between">
+                  <div>
+                    <div className="text-white font-semibold">{e.description}</div>
+                    <div className="text-xs text-slate-500">{e.category} • {formatDate(e.date)}</div>
+                  </div>
+                  <div className="text-rose-400 font-black">-{formatCurrency(e.amount)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openModal?.type === 'income' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/80 backdrop-blur-xl p-4">
+          <div className="bg-[#1e293b] w-full max-w-xl rounded-[32px] shadow-2xl border border-white/10 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">Receitas do Mês — Explicação</h3>
+              <button onClick={() => setOpenModal(null)} className="text-slate-400 hover:text-white">Fechar</button>
+            </div>
+            <p className="text-slate-400 mb-4">As receitas do mês incluem cotas e outras entradas registradas. Confira o relatório de transparência para detalhes.</p>
+          </div>
+        </div>
+      )}
+
+      {openModal?.type === 'alerts' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/80 backdrop-blur-xl p-4">
+          <div className="bg-[#1e293b] w-full max-w-md rounded-[32px] shadow-2xl border border-white/10 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">Alertas Ativos</h3>
+              <button onClick={() => setOpenModal(null)} className="text-slate-400 hover:text-white">Fechar</button>
+            </div>
+            <div className="divide-y divide-white/5">
+              {latestNotifications.map(n => (
+                <div key={n.id} className="py-3">
+                  <div className="text-white font-semibold">{n.title}</div>
+                  <div className="text-xs text-slate-500">{formatDate(n.date)}</div>
+                  <p className="text-slate-400 mt-2 text-sm">{n.message}</p>
+                </div>
+              ))}
+              {latestNotifications.length === 0 && <p className="text-slate-500 py-6">Sem alertas.</p>}
+            </div>
+          </div>
+        </div>
+      )}
           {/* Abstract glow */}
           <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-indigo-500 rounded-full blur-[100px] opacity-10 pointer-events-none" />
         </div>
@@ -146,6 +219,7 @@ export function Dashboard({ user }: { user: User }) {
           <div className="space-y-5 flex-1">
             {latestExpenses.map((expense) => (
               <div key={expense.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all group">
+                
                 <div className="flex items-center space-x-4">
                   <div className="h-10 w-10 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center font-bold text-sm border border-indigo-500/20">
                     {expense.description.charAt(0).toUpperCase()}

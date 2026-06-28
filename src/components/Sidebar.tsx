@@ -10,7 +10,8 @@ import {
   Users,
   Wrench,
   AlertTriangle,
-  ShieldCheck
+  ShieldCheck,
+  Calendar
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -20,9 +21,10 @@ interface SidebarProps {
   setView: (view: any) => void;
   onLogout: () => void;
   isOpen: boolean;
+  pendingCount?: number;
 }
 
-export function Sidebar({ user, currentView, setView, onLogout, isOpen }: SidebarProps) {
+export function Sidebar({ user, currentView, setView, onLogout, isOpen, pendingCount = 0 }: SidebarProps) {
   const isAdmin = user.role === "admin";
 
   const menuItems = [
@@ -30,6 +32,7 @@ export function Sidebar({ user, currentView, setView, onLogout, isOpen }: Sideba
     { id: "portal", label: "Portal do Morador", icon: Users, roles: ["admin", "resident"] },
     { id: "occurrences", label: "Ocorrências", icon: AlertTriangle, roles: ["admin", "resident"] },
     { id: "maintenance", label: "Manutenção", icon: Wrench, roles: ["admin", "resident"] },
+    { id: "reservations", label: "Reservas", icon: Calendar, roles: ["admin", "resident"] },
     { id: "transparency", label: "Relatórios", icon: FileText, roles: ["admin", "resident"] },
     { id: "notifications", label: "Mural de Avisos", icon: Bell, roles: ["admin", "resident"] },
     { id: "expenses", label: "Despesas", icon: Receipt, roles: ["admin"] },
@@ -68,7 +71,12 @@ export function Sidebar({ user, currentView, setView, onLogout, isOpen }: Sideba
               )}
             >
               <Icon size={18} className={cn("transition-colors", isActive ? "text-indigo-400" : "text-slate-500 group-hover:text-slate-300")} />
-              <span>{item.label}</span>
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.id === "admin-users" && pendingCount > 0 && (
+                <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {pendingCount}
+                </span>
+              )}
             </button>
           );
         })}

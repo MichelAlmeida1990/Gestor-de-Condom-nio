@@ -14,7 +14,7 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+  ssl: { rejectUnauthorized: false },
 });
 
 export async function query<T = any>(text: string, params: unknown[] = []) {
@@ -82,6 +82,22 @@ export async function initDB(): Promise<Pool> {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS maintenance_requests (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        category TEXT NOT NULL,
+        priority TEXT NOT NULL CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'cancelled')),
+        requested_by TEXT NOT NULL,
+        assigned_to TEXT,
+        cost NUMERIC,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMPTZ
+      );
+
       CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
         title TEXT,
@@ -100,6 +116,33 @@ export async function initDB(): Promise<Pool> {
         status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS unit TEXT,
+        ADD COLUMN IF NOT EXISTS phone TEXT,
+        ADD COLUMN IF NOT EXISTS cpf TEXT,
+        ADD COLUMN IF NOT EXISTS birthdate DATE,
+        ADD COLUMN IF NOT EXISTS emergency_contact TEXT,
+        ADD COLUMN IF NOT EXISTS emergency_phone TEXT,
+        ADD COLUMN IF NOT EXISTS blood_type TEXT,
+        ADD COLUMN IF NOT EXISTS health_notes TEXT,
+        ADD COLUMN IF NOT EXISTS vehicles TEXT
+    `);
+
+    // Backfill optional text columns to nullable for existing non-null constraints
+    await client.query(`
+      ALTER TABLE users
+        ALTER COLUMN unit DROP NOT NULL,
+        ALTER COLUMN phone DROP NOT NULL,
+        ALTER COLUMN cpf DROP NOT NULL,
+        ALTER COLUMN birthdate DROP NOT NULL,
+        ALTER COLUMN emergency_contact DROP NOT NULL,
+        ALTER COLUMN emergency_phone DROP NOT NULL,
+        ALTER COLUMN blood_type DROP NOT NULL,
+        ALTER COLUMN health_notes DROP NOT NULL,
+        ALTER COLUMN vehicles DROP NOT NULL
     `);
 
     const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
