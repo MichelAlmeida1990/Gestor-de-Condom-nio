@@ -16,15 +16,20 @@ const maintenanceSchema = z.object({
 });
 
 router.get("/", authenticate, async (req: AuthRequest, res) => {
-  if (req.user?.role === "admin") {
-    const data = await query(
-      "SELECT m.*, u.name as user_name, u.unit FROM maintenance_requests m JOIN users u ON m.user_id = u.id ORDER BY m.created_at DESC"
-    );
-    return res.json(data);
-  }
+  try {
+    if (req.user?.role === "admin") {
+      const data = await query(
+        "SELECT m.*, u.name as user_name, u.unit FROM maintenance_requests m JOIN users u ON m.user_id = u.id ORDER BY m.created_at DESC"
+      );
+      return res.json(data);
+    }
 
-  const data = await query("SELECT * FROM maintenance_requests WHERE user_id = $1 ORDER BY created_at DESC", [req.user?.id]);
-  res.json(data);
+    const data = await query("SELECT * FROM maintenance_requests WHERE user_id = $1 ORDER BY created_at DESC", [req.user?.id]);
+    res.json(data);
+  } catch (error) {
+    console.error("Maintenance fetch error:", error);
+    res.status(500).json({ error: "Erro ao buscar solicitações de manutenção" });
+  }
 });
 
 router.post("/", authenticate, async (req: AuthRequest, res) => {
