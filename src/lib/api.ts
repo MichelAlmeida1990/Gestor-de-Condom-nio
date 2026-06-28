@@ -12,6 +12,12 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
+function logoutAndRedirect() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  window.location.href = "/";
+}
+
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -44,6 +50,10 @@ export const api = {
     const res = await fetchWithTimeout(buildUrl(path), {
       headers: authHeaders(),
     });
+    if (res.status === 401) {
+      logoutAndRedirect();
+      throw new Error(await parseError(res));
+    }
     if (!res.ok) throw new Error(await parseError(res));
     return res.json();
   },
@@ -54,6 +64,10 @@ export const api = {
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(data),
     });
+    if (res.status === 401) {
+      logoutAndRedirect();
+      throw new Error(await parseError(res));
+    }
     if (!res.ok) throw new Error(await parseError(res));
     return res.json();
   },
@@ -64,6 +78,10 @@ export const api = {
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(data),
     });
+    if (res.status === 401) {
+      logoutAndRedirect();
+      throw new Error(await parseError(res));
+    }
     if (!res.ok) throw new Error(await parseError(res));
     return res.json();
   },
@@ -73,6 +91,10 @@ export const api = {
       method: "DELETE",
       headers: authHeaders(),
     });
+    if (res.status === 401) {
+      logoutAndRedirect();
+      throw new Error(await parseError(res));
+    }
     if (!res.ok) throw new Error(await parseError(res));
     return res.json();
   },
